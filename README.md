@@ -31,7 +31,7 @@ Restart ComfyUI after installing.
 
 - **Load a ROM**
   - The emulator UI is inside the node.
-  - Use the emulator's menu to load a GBA bios, and `.gba` or `.gbc` ROM.
+  - Use the emulator's menu to load a GBA bios, and `.gba` ROM.
 
 ## Notes
 
