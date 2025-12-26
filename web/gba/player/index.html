@@ -1,0 +1,243 @@
+<!--
+
+GBA ONLINE;  GBA.JS.ORG;  "Online GameBoy Advance Emulator"
+Copyright (C) 2021-present AYVACS
+Licensed under the MIT License (view LICENSE.md for more information)
+
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ComfyUI Game Boy - powered by IodineGBA and GBA Online</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=160">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    <link rel="manifest" href="manifest.json">
+
+    <link href="../assets/macos-11x/Icon-MacOS-512x512@2x.png" type="image/png" rel="shortcut icon">
+    <link href="../assets/macos-11x/apple-touch-icon.png" type="image/png" rel="apple-touch-icon">
+
+    <link rel="stylesheet" href="../stylesheets/main.css">
+    <link rel="stylesheet" href="../stylesheets/player-override.css">
+
+    <script src="../vendor/jquery-3.6.0.min.js.txt"></script>
+</head>
+
+<body>
+    <div id="container">
+        <div id="menu" class="paused">
+            <ul class="menu" id="menu_top">
+                <li>
+                    <a href="#logo">
+                        <img id="logo-small" src="../assets/logo-small.png">
+                    </a>
+                </li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <li>
+                    <a target="_blank" style="text-decoration: none;" href="https://github.com/ayvacs/gba.js.org">Source</a>
+                </li>
+                <li>|</li>
+                <li>File
+                    <ul>
+                        <li><span>BIOS: </span> <input type="file" id="bios_load" class="files"></li>
+                        <li><span>Game: </span> <input type="file" id="rom_load" class="files"></li>
+                    </ul>
+                </li>
+                <li id="play" class="show">Play</li>
+                <li id="pause" class="hide">Pause</li>
+                <li id="restart">Restart</li>
+                <li>Settings
+                    <ul>
+                        <li><input type="checkbox" id="skip_boot"> Skip Boot Intro</li>
+                        <li><input type="checkbox" id="toggleSmoothScaling" checked="checked"> Smooth Scaling</li>
+                        <li><input type="checkbox" id="toggleDynamicSpeed"> Dynamic Speed</li>
+                        <li><input type="checkbox" id="offthread-cpu" checked="checked"> CPU off-thread</li>
+                        <li><input type="checkbox" id="offthread-gpu" checked="checked"> GPU off-thread</li>
+                        <li><input type="checkbox" id="sound"> Sound</li>
+                        <li>GBA Bindings
+                            <ul>
+                                <li id="key_a"><span>A</span></li>
+                                <li id="key_b"><span>B</span></li>
+                                <li id="key_l"><span>L</span></li>
+                                <li id="key_r"><span>R</span></li>
+                                <li id="key_start"><span>Start</span></li>
+                                <li id="key_select"><span>Select</span></li>
+                                <li id="key_up"><span>↑</span></li>
+                                <li id="key_down"><span>↓</span></li>
+                                <li id="key_left"><span>←</span></li>
+                                <li id="key_right"><span>→</span></li>
+                            </ul>
+                        </li>
+                        <li>Emulator Bindings
+                            <ul>
+                                <li id="key_volumeup"><span>Volume Up</span>
+                                </li>
+                                <li id="key_volumedown"><span>Volume Down</span>
+                                </li>
+                                <li id="key_speedup"><span>Speed Up</span></li>
+                                <li id="key_slowdown"><span>Slow Down</span></li>
+                                <li id="key_speedreset"><span>Speed Reset</span></li>
+                                <li id="key_fullscreen"><span>Fullscreen</span></li>
+                                <li id="key_playpause"><span>Play/Pause</span></li>
+                                <li id="key_restart"><span>Restart</span></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    Volume
+                    <ul>
+                        <li>
+                            <input type="range" id="volume">
+                        </li>
+                    </ul>
+                </li>
+                <li id="saves_menu">
+                    Saves
+                    <ul id="saves_menu_container">
+                        <li><span>Import:</span><input type="file" id="import" class="files"></li>
+                        <li id="existing_saves">
+                            <span>Existing Saves</span>
+                            <ul id="existing_saves_list">
+
+                            </ul>
+                        </li>
+                        <li><a href="./" id="export" target="_new">Export All Saves</a></li>
+                    </ul>
+                </li>
+                <li id="fullscreen">Fullscreen</li>
+                <li>
+                    <span id="speed">Speed</span>
+                    <ul>
+                        <li>
+                            <input type="range" id="speedset">
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <div id="main">
+            <canvas class="canvas" id="emulator_target" width="240" height="160"></canvas>
+        </div>
+        <div class="touch-controls">
+            <div class="touch-dpad">
+                <button id="touch-up"></button>
+                <button id="touch-left"></button>
+                <button id="center-placeholder"></button>
+                <button id="touch-right"></button>
+                <button id="touch-down"></button>
+            </div>
+            <button id="touch-select">SELECT</button>
+            <button id="touch-start">START</button>
+            <button id="touch-a">A</button>
+            <button id="touch-b">B</button><br>
+            <button id="touch-l">L</button>
+            <button id="touch-r">R</button>
+        </div>
+        <span class="message" id="tempMessage"></span>
+    </div>
+
+    <!-- Required Scripts -->
+
+    <!-- Iodine Emu -->
+    <script src="../iodineGBA/includes/TypedArrayShim.js.txt"></script>
+    <script src="../iodineGBA/core/Cartridge.js.txt"></script>
+    <script src="../iodineGBA/core/DMA.js.txt"></script>
+    <script src="../iodineGBA/core/Emulator.js.txt"></script>
+    <script src="../iodineGBA/core/Graphics.js.txt"></script>
+    <script src="../iodineGBA/core/RunLoop.js.txt"></script>
+    <script src="../iodineGBA/core/Memory.js.txt"></script>
+    <script src="../iodineGBA/core/IRQ.js.txt"></script>
+    <script src="../iodineGBA/core/JoyPad.js.txt"></script>
+    <script src="../iodineGBA/core/Serial.js.txt"></script>
+    <script src="../iodineGBA/core/Sound.js.txt"></script>
+    <script src="../iodineGBA/core/Timer.js.txt"></script>
+    <script src="../iodineGBA/core/Wait.js.txt"></script>
+    <script src="../iodineGBA/core/CPU.js.txt"></script>
+    <script src="../iodineGBA/core/Saves.js.txt"></script>
+    <script src="../iodineGBA/core/sound/FIFO.js.txt"></script>
+    <script src="../iodineGBA/core/sound/Channel1.js.txt"></script>
+    <script src="../iodineGBA/core/sound/Channel2.js.txt"></script>
+    <script src="../iodineGBA/core/sound/Channel3.js.txt"></script>
+    <script src="../iodineGBA/core/sound/Channel4.js.txt"></script>
+    <script src="../iodineGBA/core/CPU/ARM.js.txt"></script>
+    <script src="../iodineGBA/core/CPU/THUMB.js.txt"></script>
+    <script src="../iodineGBA/core/CPU/CPSR.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/Renderer.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/RendererShim.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/RendererProxy.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/BGTEXT.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/BG2FrameBuffer.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/BGMatrix.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/AffineBG.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/ColorEffects.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/Mosaic.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/OBJ.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/OBJWindow.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/Window.js.txt"></script>
+    <script src="../iodineGBA/core/graphics/Compositor.js.txt"></script>
+    <script src="../iodineGBA/core/memory/DMA0.js.txt"></script>
+    <script src="../iodineGBA/core/memory/DMA1.js.txt"></script>
+    <script src="../iodineGBA/core/memory/DMA2.js.txt"></script>
+    <script src="../iodineGBA/core/memory/DMA3.js.txt"></script>
+    <script src="../iodineGBA/core/cartridge/SaveDeterminer.js.txt"></script>
+    <script src="../iodineGBA/core/cartridge/SRAM.js.txt"></script>
+    <script src="../iodineGBA/core/cartridge/FLASH.js.txt"></script>
+    <script src="../iodineGBA/core/cartridge/EEPROM.js.txt"></script>
+    <script src="../iodineGBA/core/cartridge/GPIO.js.txt"></script>
+
+    <!-- user scripts -->
+    <script src="../modules/AudioGlueCode.js.txt"></script>
+    <script src="../modules/base64.js.txt"></script>
+    <script src="../modules/GfxGlueCode.js.txt"></script>
+    <script src="../modules/GUIGlueCode.js.txt"></script>
+    <script src="../modules/JoyPadGlueCode.js.txt"></script>
+    <script src="../modules/ROMLoadGlueCode.js.txt"></script>
+    <script src="../modules/SavesGlueCode.js.txt"></script>
+    <script src="../modules/WorkerGfxGlueCode.js.txt"></script>
+    <script src="../modules/WorkerGlueCode.js.txt"></script>
+    <script src="../modules/XAudioJS/swfobject.js.txt"></script>
+    <script src="../modules/XAudioJS/resampler.js.txt"></script>
+    <script src="../modules/XAudioJS/XAudioServer.js.txt"></script>
+    <script src="../modules/CoreGlueCode.js.txt"></script>
+    
+    <!-- show a warning when leaving the page -->
+    <script>
+        window.addEventListener('beforeunload', function(e) {
+            // Cancel the event
+            e.preventDefault(); // If you prevent default behavior in Mozilla Firefox prompt will always be shown
+            // Chrome requires returnValue to be set
+            e.returnValue = '';
+        });
+    </script>
+
+    <script>
+        (function() {
+            function setVar(name, value) {
+                if (!value) return;
+                document.documentElement.style.setProperty(name, value);
+            }
+
+            window.addEventListener('message', function(ev) {
+                try {
+                    if (!ev || !ev.data || typeof ev.data !== 'object') return;
+                    if (ev.data.type !== 'was-gba-theme') return;
+                    var t = ev.data.tokens || {};
+                    setVar('--was-gba-menu-bg', t.bg);
+                    setVar('--was-gba-menu-fg', t.fg);
+                    setVar('--was-gba-menu-border', t.border);
+                    setVar('--was-gba-accent', t.accent);
+                } catch (e) {
+                }
+            });
+
+            try {
+                window.parent && window.parent.postMessage({ type: 'was-gba-request-theme' }, '*');
+            } catch (e) {
+            }
+        })();
+    </script>
+</body>
+
+</html>
