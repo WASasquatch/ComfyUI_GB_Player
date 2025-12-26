@@ -1,6 +1,8 @@
 
 # ComfyUI Game Boy Player
 
+![](screenshot.png)
+
 Embeds a self-contained Game Boy Advance emulator UI inside a ComfyUI node.
 
 This project vendors a static build of the web emulator UI based on [gba.js.org](https://gba.js.org), so it can run offline inside ComfyUI.
