@@ -69,7 +69,7 @@ canvas {
     margin: auto;
     display: block;
     padding: 0px;
-    background-color: rgb(248, 248, 248);
+    background-color: transparent !important;
     cursor: none;
 }
 

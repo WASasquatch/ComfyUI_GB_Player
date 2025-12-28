@@ -1,7 +1,4 @@
-import os
-
-
-WEB_DIRECTORY = os.path.join(os.path.dirname(__file__), "web")
+WEB_DIRECTORY = "./web"
 
 class ComfyGameBoyPlayer:
     @classmethod

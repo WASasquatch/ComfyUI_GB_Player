@@ -1,4 +1,7 @@
+/* WAS GB Player v2024.12.28.1135 */
 import { app } from "../../scripts/app.js";
+
+console.log("[WAS GBA] ===== SCRIPT LOADED v2024.12.28.1135 =====");
 
 const EXT_NAME = "WAS.GameBoyPlayer";
 const NODE_NAME = "ComfyGameBoyPlayer";
@@ -8,6 +11,8 @@ const DEFAULT_NODE_SIZE = [730, 480];
 const STATE = {
   container: null,
   nodeIdToIframe: new Map(),
+  cleanupIntervalId: null,
+  cleanupListenersAttached: false,
 };
 
 function readCssVar(style, name) {
@@ -64,9 +69,10 @@ function attachThemeSync(iframe) {
   if (iframe.__wasThemeSyncAttached) return;
   iframe.__wasThemeSyncAttached = true;
 
-  iframe.addEventListener("load", () => {
+  const onLoad = () => {
     postThemeToIframe(iframe);
-  });
+  };
+  iframe.addEventListener("load", onLoad);
 
   const onMsg = (ev) => {
     try {
@@ -81,7 +87,94 @@ function attachThemeSync(iframe) {
 
   const mo = new MutationObserver(() => postThemeToIframe(iframe));
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+ 
+  iframe.__wasThemeSyncCleanup = () => {
+    try {
+      iframe.removeEventListener("load", onLoad);
+    } catch (e) {
+    }
+    try {
+      window.removeEventListener("message", onMsg);
+    } catch (e) {
+    }
+    try {
+      mo.disconnect();
+    } catch (e) {
+    }
+  };
  }
+
+function getActiveGraphNodes() {
+  const g = app?.graph || app?.canvas?.graph;
+  const nodes = g?._nodes || g?.nodes;
+  return Array.isArray(nodes) ? nodes : [];
+}
+
+function isGbPlayerNode(node) {
+  try {
+    return (
+      node?.comfyClass === NODE_NAME ||
+      node?.type === NODE_NAME ||
+      node?.constructor?.comfyClass === NODE_NAME ||
+      node?.constructor?.type === NODE_NAME
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+function removeIframeByKey(key) {
+  try {
+    const iframe = STATE.nodeIdToIframe.get(key);
+    if (!iframe) return;
+    try {
+      iframe.__wasThemeSyncCleanup?.();
+    } catch (e) {
+    }
+    iframe.remove();
+  } catch (e) {
+  } finally {
+    STATE.nodeIdToIframe.delete(key);
+  }
+}
+
+function cleanupOrphanIframes() {
+  try {
+    const nodes = getActiveGraphNodes();
+    const activeIds = new Set(
+      nodes
+        .filter((n) => isGbPlayerNode(n))
+        .map((n) => String(n.id))
+    );
+
+    for (const key of Array.from(STATE.nodeIdToIframe.keys())) {
+      if (!activeIds.has(key)) {
+        removeIframeByKey(key);
+      }
+    }
+
+    if (STATE.nodeIdToIframe.size === 0 && STATE.container) {
+      try {
+        STATE.container.remove();
+      } catch (e) {
+      }
+      STATE.container = null;
+    }
+  } catch (e) {
+  }
+}
+
+function ensureCleanupRunning() {
+  if (STATE.cleanupIntervalId != null) return;
+  STATE.cleanupIntervalId = window.setInterval(() => cleanupOrphanIframes(), 1000);
+  if (!STATE.cleanupListenersAttached) {
+    STATE.cleanupListenersAttached = true;
+    const onVis = () => cleanupOrphanIframes();
+    const onFocus = () => cleanupOrphanIframes();
+    window.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFocus);
+  }
+}
 
 function getContainer() {
   if (STATE.container) return STATE.container;
@@ -100,6 +193,9 @@ function getContainer() {
 }
 
 function ensureIframeForNode(node) {
+  cleanupOrphanIframes();
+  ensureCleanupRunning();
+
   const key = String(node.id);
   const existing = STATE.nodeIdToIframe.get(key);
   if (existing) return existing;
@@ -128,9 +224,8 @@ function ensureIframeForNode(node) {
   const oldOnRemoved = node.onRemoved;
   node.onRemoved = function () {
     try {
-      const i = STATE.nodeIdToIframe.get(String(this.id));
-      if (i) i.remove();
-      STATE.nodeIdToIframe.delete(String(this.id));
+      removeIframeByKey(String(this.id));
+      cleanupOrphanIframes();
     } catch (e) {
     }
     return oldOnRemoved ? oldOnRemoved.apply(this, arguments) : undefined;
@@ -190,6 +285,8 @@ app.registerExtension({
   name: EXT_NAME,
   async beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData?.name !== NODE_NAME) return;
+
+    ensureCleanupRunning();
 
     const oldOnNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
