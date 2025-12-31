@@ -219,15 +219,23 @@ Licensed under the MIT License (view LICENSE.md for more information)
                 document.documentElement.style.setProperty(name, value);
             }
 
+            function applyScale(scale) {
+                if (typeof scale !== 'number' || !isFinite(scale) || scale <= 0) return;
+                document.documentElement.style.zoom = scale;
+            }
+
             window.addEventListener('message', function(ev) {
                 try {
                     if (!ev || !ev.data || typeof ev.data !== 'object') return;
-                    if (ev.data.type !== 'was-gba-theme') return;
-                    var t = ev.data.tokens || {};
-                    setVar('--was-gba-menu-bg', t.bg);
-                    setVar('--was-gba-menu-fg', t.fg);
-                    setVar('--was-gba-menu-border', t.border);
-                    setVar('--was-gba-accent', t.accent);
+                    if (ev.data.type === 'was-gba-theme') {
+                        var t = ev.data.tokens || {};
+                        setVar('--was-gba-menu-bg', t.bg);
+                        setVar('--was-gba-menu-fg', t.fg);
+                        setVar('--was-gba-menu-border', t.border);
+                        setVar('--was-gba-accent', t.accent);
+                    } else if (ev.data.type === 'was-gba-scale') {
+                        applyScale(ev.data.scale);
+                    }
                 } catch (e) {
                 }
             });

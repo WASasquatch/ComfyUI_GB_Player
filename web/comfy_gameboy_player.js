@@ -13,6 +13,7 @@ const STATE = {
   nodeIdToIframe: new Map(),
   cleanupIntervalId: null,
   cleanupListenersAttached: false,
+  lastScaleByNode: new Map(),
 };
 
 function readCssVar(style, name) {
@@ -65,12 +66,26 @@ function postThemeToIframe(iframe) {
   }
 }
 
-function attachThemeSync(iframe) {
+function postScaleToIframe(iframe, scale) {
+  try {
+    const payload = {
+      type: "was-gba-scale",
+      scale: scale,
+    };
+    iframe.contentWindow?.postMessage(payload, "*");
+  } catch (e) {
+  }
+}
+
+function attachThemeSync(iframe, nodeId) {
   if (iframe.__wasThemeSyncAttached) return;
   iframe.__wasThemeSyncAttached = true;
 
   const onLoad = () => {
     postThemeToIframe(iframe);
+    const scale = app.canvas?.ds?.scale ?? 1;
+    postScaleToIframe(iframe, scale);
+    STATE.lastScaleByNode.set(String(nodeId), scale);
   };
   iframe.addEventListener("load", onLoad);
 
@@ -80,6 +95,8 @@ function attachThemeSync(iframe) {
       if (!ev?.data || typeof ev.data !== "object") return;
       if (ev.data.type !== "was-gba-request-theme") return;
       postThemeToIframe(iframe);
+      const scale = app.canvas?.ds?.scale ?? 1;
+      postScaleToIframe(iframe, scale);
     } catch (e) {
     }
   };
@@ -186,7 +203,7 @@ function getContainer() {
   el.style.width = "0";
   el.style.height = "0";
   el.style.pointerEvents = "none";
-  el.style.zIndex = "1000";
+  el.style.zIndex = "100";
   document.body.appendChild(el);
   STATE.container = el;
   return el;
@@ -216,7 +233,7 @@ function ensureIframeForNode(node) {
   const src = "extensions/ComfyUI_GB_Player/gba/player/index.html";
   iframe.src = src;
 
-  attachThemeSync(iframe);
+  attachThemeSync(iframe, node.id);
 
   getContainer().appendChild(iframe);
   STATE.nodeIdToIframe.set(key, iframe);
@@ -310,6 +327,12 @@ app.registerExtension({
       try {
         const iframe = ensureIframeForNode(this);
         updateIframeRect(this, iframe);
+        const scale = app.canvas?.ds?.scale ?? 1;
+        const nodeKey = String(this.id);
+        if (STATE.lastScaleByNode.get(nodeKey) !== scale) {
+          STATE.lastScaleByNode.set(nodeKey, scale);
+          postScaleToIframe(iframe, scale);
+        }
       } catch (e) {
       }
       return r;
